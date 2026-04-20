@@ -1,0 +1,127 @@
+project:
+  name: "SemGrasp-Minor"
+  seed: 42
+  device: "cuda"  # auto-falls to cpu if unavailable
+
+dataset:
+  objects:
+    mug:
+      images: ["mug_1.jpg", "mug_2.jpg", "mug_3.jpg", "mug_4.jpg", "mug_5.jpg"]
+      regions:
+        handle: [13, 64, 61, 155]    # representative — mug_1 coords
+        body:   [60, 60, 161, 178]
+      tasks:
+        use:      {correct_region: "handle", action: "pour",  task_id: 0}
+        handover: {correct_region: "body",   action: "pass",  task_id: 1}
+
+    knife:
+      images: ["knife_1.jpg", "knife_2.jpg", "knife_3.jpg", "knife_4.jpg", "knife_5.jpg"]
+      regions:
+        handle: [108, 78, 212, 153]  # representative — knife_1 coords
+        blade:  [8,   78, 109, 147]
+      tasks:
+        use:      {correct_region: "handle", action: "cut",   task_id: 0}
+        handover: {correct_region: "handle", action: "pass",  task_id: 1}
+
+    glass:
+      images: ["glass_1.jpg", "glass_2.jpg", "glass_3.jpg", "glass_4.jpg", "glass_5.jpg"]
+      regions:
+        body:   [8,  77,  72, 182]   # representative — glass_1 coords
+        handle: [75, 62, 182, 210]
+      tasks:
+        use:      {correct_region: "body",   action: "drink", task_id: 0}
+        handover: {correct_region: "handle", action: "pass",  task_id: 1}
+
+    hammer:
+      images: ["hammer_1.jpg", "hammer_2.jpg", "hammer_3.jpg", "hammer_4.jpg", "hammer_5.jpg"]
+      regions:
+        handle: [95,  72, 126, 208]  # representative — hammer_1 coords
+        head:   [33,  16, 187,  74]
+      tasks:
+        use:      {correct_region: "handle", action: "hit",   task_id: 0}
+        handover: {correct_region: "head",   action: "pass",  task_id: 1}
+
+    pan:
+      images: ["pan_1.jpg", "pan_2.jpg", "pan_3.jpg", "pan_4.jpg", "pan_5.jpg"]
+      regions:
+        handle: [143, 79, 211,  99]  # representative — pan_1 coords
+        body:   [14,  86, 134, 142]
+      tasks:
+        use:      {correct_region: "handle", action: "cook",  task_id: 0}
+        handover: {correct_region: "body",   action: "pass",  task_id: 1}
+
+  region_stability_prior:
+    handle:  0.85
+    body:    0.75
+    blade:   0.50
+    head:    0.60
+    outside: 0.50
+
+  split: {train: 0.80, val: 0.10, test: 0.10}
+  image_size: 224
+
+training:
+  epochs: 60
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+  early_stopping_patience: 10
+  grad_clip: 1.0
+  warmup_epochs: 5
+
+  # Physics model: delay physics loss by N epochs
+  physics_warmup_epochs: 5
+
+optimizer:
+  name: "adamw"
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+
+scheduler:
+  name: "cosine"          # cosine | step | plateau
+  T_max: 60
+  eta_min: 1.0e-6
+
+losses:
+  baseline:
+    lambda_reg: 0.5       # weight on regression loss
+
+  physics:
+    lambda_reg: 0.5
+    lambda_physics: 0.4   # total physics loss weight
+    lambda_consist: 0.4   # within physics: consistency
+    lambda_rank: 0.3      # within physics: ranking
+    lambda_region: 0.3    # within physics: region margin
+    rank_margin: 0.10
+    pos_margin: 0.60      # positive samples must score above this
+    neg_margin: 0.40      # negative samples must score below this
+
+model:
+  task_embed_dim: 64
+  backbone: "resnet50"    # resnet50 | resnet34
+  freeze_backbone_epochs: 5   # freeze backbone for first N epochs
+  trunk_dims: [512, 128]
+  dropout: 0.3
+
+inference:
+  alpha: 0.60             # GQS semantic weight
+  beta: 0.25             # GQS stability weight
+  gamma: 0.15            # GQS physics weight (physics model only)
+  thresholds:
+    excellent:   80
+    acceptable:  60
+    poor:        40
+
+hyperparameter_tune:
+  n_trials: 30
+  timeout: 3600           # seconds
+  sampler: "tpe"
+  pruner: "median"
+  search_space:
+    lr:              [1.0e-5, 1.0e-3]
+    weight_decay:    [1.0e-5, 1.0e-3]
+    dropout:         [0.1, 0.5]
+    lambda_reg:      [0.1, 1.0]
+    lambda_physics:  [0.1, 0.8]
+    batch_size:      [16, 32, 64]
+    task_embed_dim:  [32, 64, 128]
