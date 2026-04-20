@@ -1,0 +1,21 @@
+# Data — too large for GitHub
+data/
+grasp_dataset/
+
+# Training outputs
+checkpoints/
+runs/
+evaluate/*.png
+evaluate/results.json
+
+# Tune outputs
+tune/best_params_*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Colab
+.ipynb_checkpoints/
